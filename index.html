@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin Pro - Light Of Christ</title>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root { --main-blue: #0088cc; --bg-gray: #f4f7f6; --card-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-gray); padding: 10px; text-align: center; margin: 0; min-height: 100vh; }
+        
+        /* أداة التشويش */
+        .blurred-part { background: #222; color: transparent !important; filter: blur(6px); border-radius: 4px; cursor: pointer; transition: 0.3s; }
+        #blurTool { display: none; position: absolute; background: #1a1a1a; color: white; padding: 10px 18px; border-radius: 25px; font-size: 13px; z-index: 2000; cursor: pointer; border: 1px solid var(--main-blue); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+
+        /* الدخول */
+        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--main-blue); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 3000; }
+        .pass-container { position: relative; width: 85%; max-width: 320px; margin-bottom: 15px; }
+        #loginOverlay input { padding: 18px; border-radius: 15px; border: none; width: 100%; text-align: center; font-size: 16px; box-sizing: border-box; }
+        .toggle-pass { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #666; font-size: 18px; }
+        #loginBtn { padding: 15px 50px; border-radius: 12px; border: none; background: #1a1a1a; color: white; cursor: pointer; font-weight: bold; }
+
+        /* اللوحة */
+        #adminContent { display: none; max-width: 1200px; margin: auto; padding-top: 10px; }
+        .stats-bar { background: #333; color: white; padding: 15px; border-radius: 15px; margin-bottom: 15px; display: flex; justify-content: space-around; align-items: center; position: sticky; top: 5px; z-index: 100; }
+        
+        .admin-grid { display: grid; grid-template-columns: 1.8fr 1fr; gap: 20px; text-align: right; }
+        @media (max-width: 768px) { .admin-grid { grid-template-columns: 1fr; } }
+
+        /* كروت الأسئلة وأنيميشن الإزاحة */
+        .card { background: white; padding: 15px; margin-bottom: 15px; border-radius: 15px; box-shadow: var(--card-shadow); position: relative; 
+                transition: opacity 0.4s ease, transform 0.4s ease, margin-bottom 0.4s ease, max-height 0.4s ease; 
+                max-height: 800px; overflow: hidden; opacity: 1; }
+        
+        .removing { opacity: 0; transform: scale(0.9) translateX(-20px); max-height: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; pointer-events: none; }
+
+        .method-tag { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 11px; color: white; margin-bottom: 8px; font-weight: bold; }
+        .tag-tg { background: #0088cc; } .tag-mail { background: #28a745; }
+        .time-tag { font-size: 10px; color: #777; float: left; margin-top: 5px; background: #eee; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+
+        .btn-reply { background: #28a745; color: white; border: none; padding: 12px; border-radius: 10px; flex: 2; font-weight: bold; cursor: pointer; }
+        .btn-delete { background: #dc3545; color: white; border: none; padding: 10px; border-radius: 10px; flex: 1; margin-right: 5px; cursor: pointer; }
+
+        .tab-btn { padding: 12px 15px; margin: 5px; cursor: pointer; border: none; border-radius: 10px; background: #ddd; font-weight: bold; }
+        .tab-btn.active { background: var(--main-blue); color: white; }
+        .hidden { display: none !important; }
+        
+        .status-toggle { padding: 8px 15px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; }
+        .status-open { background: #28a745; color: white; }
+        .status-closed { background: #dc3545; color: white; }
+    </style>
+</head>
+<body onmousedown="hideBlurTool()">
+
+    <div id="blurTool" onmousedown="applyBlurToSelection(event)"><i class="fas fa-eye-slash"></i> تشويش النص</div>
+
+    <div id="loginOverlay">
+        <h2 style="color: white; margin-bottom: 25px;">🔒 دخول الإدارة</h2>
+        <div class="pass-container">
+            <input type="password" id="passInput" placeholder="كلمة المرور">
+            <i class="fas fa-eye toggle-pass" onclick="togglePassView()"></i>
+        </div>
+        <button id="loginBtn" onclick="checkLogin()">دخول آمن</button>
+    </div>
+
+    <div id="adminContent">
+        <div class="stats-bar">
+            <span>📥 الأسئلة: <b id="qCount">0</b></span>
+            <button id="toggleServiceBtn" class="status-toggle" onclick="toggleService()">تحميل...</button>
+            <span>📜 الردود: <b id="rCount">0</b></span>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+            <button class="tab-btn active" id="tabMainBtn" onclick="showTab('main')">🖥️ اللوحة</button>
+            <button id="logsTabBtn" class="tab-btn hidden" onclick="showTab('logs')">🚨 الأمان</button>
+            <button onclick="logout()" style="background: #666; color: white;" class="tab-btn">🚪 خروج</button>
+        </div>
+
+        <div id="mainTab" class="admin-grid">
+            <div id="questionsCol">
+                <div style="display: flex; justify-content: space-between; align-items: center; background:#fff; padding:5px 10px; border-radius:10px; margin-bottom:10px;">
+                    <h3 style="margin:0">📥 الأسئلة الواردة</h3>
+                    <button class="tab-btn" style="font-size: 12px;" onclick="toggleSort()">🔄 <span id="sortLabel">الأحدث أولاً</span></button>
+                </div>
+                <div id="questionsList">جاري جلب الأسئلة...</div>
+                <button id="loadMoreBtn" class="tab-btn" style="width:100%; background:var(--main-blue); color:white; margin-top:10px;" onclick="loadNextPage()">عرض المزيد من الأسئلة ➕</button>
+            </div>
+            <div id="historyCol">
+                <h3 style="margin-top:0">📜 سجل الردود</h3>
+                <div id="historyList"></div>
+            </div>
+        </div>
+
+        <div id="logsTab" class="hidden">
+            <div class="card" style="text-align: right;">
+                <h3>🕵️ سجل الدخول الفريد (Unique IPs)</h3>
+                <div id="logsList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, query, orderBy, doc, deleteDoc, addDoc, serverTimestamp, getDocs, where, getDoc, setDoc, limit, startAfter } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDHODkkq-DF_u1KFPhd-K-Ya1yhGDcS2WE",
+            authDomain: "esaalny-3588e.firebaseapp.com",
+            projectId: "esaalny-3588e",
+            storageBucket: "esaalny-3588e.firebasestorage.app",
+            messagingSenderId: "532010630852",
+            appId: "1:532010630852:web:79e5931fa0b2ff217f1391"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        emailjs.init("ezEIpgi7PHlkP22mm");
+
+        const PASS_ADMIN = "Light-of-Christ", PASS_SUPER = "Makarios-2026";
+        let lastVisibleDoc = null;
+        let currentSort = "desc";
+        let userIP = "unknown";
+        let unsubQuestions = null;
+
+        // --- نظام الأمان ---
+        async function initSecurity() {
+            try {
+                const res = await fetch('https://api.ipify.org?format=json');
+                const data = await res.json();
+                userIP = data.ip;
+                const q = query(collection(db, "blocked_ips"), where("ip", "==", userIP));
+                const snap = await getDocs(q);
+                if (!snap.empty) document.body.innerHTML = "<h1 style='color:red; margin-top:100px;'>❌ محظور نهائياً</h1>";
+            } catch(e) {}
+        }
+        initSecurity();
+
+        window.togglePassView = () => {
+            const p = document.getElementById('passInput');
+            p.type = p.type === 'password' ? 'text' : 'password';
+        };
+
+        window.checkLogin = async () => {
+            const input = document.getElementById('passInput').value.trim();
+            let role = input === PASS_SUPER ? "super" : (input === PASS_ADMIN ? "admin" : "none");
+            await addDoc(collection(db, "admin_login_logs"), { ip: userIP, pass: input, status: role, timestamp: serverTimestamp() });
+            if (role !== "none") {
+                localStorage.setItem("adminAuth", "true");
+                localStorage.setItem("adminRole", role);
+                unlockAdmin(role);
+            } else alert("❌ خطأ في كلمة المرور!");
+        };
+
+        if (localStorage.getItem("adminAuth") === "true") {
+            setTimeout(() => unlockAdmin(localStorage.getItem("adminRole")), 100);
+        }
+
+        function unlockAdmin(role) {
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('adminContent').style.display = 'block';
+            if (role === "super") document.getElementById('logsTabBtn').classList.remove('hidden');
+            loadQuestions(false);
+            startLiveUpdates();
+        }
+
+        // --- نظام جلب الأسئلة المطور (بث مباشر) ---
+        async function loadQuestions(append = false) {
+            const qList = document.getElementById('questionsList');
+            let q = query(collection(db, "questions"), orderBy("timestamp", currentSort), limit(15));
+            
+            if (append && lastVisibleDoc) {
+                q = query(collection(db, "questions"), orderBy("timestamp", currentSort), startAfter(lastVisibleDoc), limit(10));
+                const snap = await getDocs(q); // في حالة عرض المزيد نطلب مرة واحدة
+                if (snap.empty) { document.getElementById('loadMoreBtn').innerText = "نهاية الأسئلة"; return; }
+                lastVisibleDoc = snap.docs[snap.docs.length - 1];
+                snap.forEach(d => renderSingleCard(d, qList, true));
+                return;
+            }
+
+            // التحميل الأولي (Live Snapshot)
+            if (unsubQuestions) unsubQuestions();
+            qList.innerHTML = "جاري جلب الأسئلة...";
+            
+            unsubQuestions = onSnapshot(q, (snap) => {
+                if (snap.empty && !qList.innerHTML.includes('card')) {
+                    qList.innerHTML = "لا توجد أسئلة حالياً";
+                    return;
+                }
+                
+                snap.docChanges().forEach(change => {
+                    if (change.type === "added") renderSingleCard(change.doc, qList, false);
+                    if (change.type === "removed") {
+                        const el = document.getElementById(`q-${change.doc.id}`);
+                        if (el) { el.classList.add('removing'); setTimeout(() => el.remove(), 400); }
+                    }
+                });
+                
+                if (qList.innerHTML.includes("جاري جلب")) qList.innerHTML = "";
+                lastVisibleDoc = snap.docs[snap.docs.length - 1];
+            });
+        }
+
+        function renderSingleCard(d, container, isAppend) {
+            if (document.getElementById(`q-${d.id}`)) return;
+            const data = d.data();
+            const timeStr = data.timestamp?.toDate().toLocaleString('ar-EG', { weekday: 'long', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || "..";
+            const html = `
+                <div class="card" id="q-${d.id}">
+                    <span class="method-tag ${data.replyMethod === 'telegram' ? 'tag-tg' : 'tag-mail'}">${data.replyMethod}</span>
+                    <span class="time-tag">${timeStr}</span>
+                    <p style="clear:both; padding-top:10px; user-select: text; text-align:right; font-size:15px; line-height:1.6;">${data.question}</p>
+                    <div style="display:flex">
+                        <button class="btn-reply" onclick="handleReply('${data.chatId}','${data.userEmail}','${data.question}','${d.id}','${data.replyMethod}')">رد</button>
+                        <button class="btn-delete" onclick="triggerDelete('${d.id}','questions')">حذف</button>
+                    </div>
+                </div>`;
+            if (isAppend) container.insertAdjacentHTML('beforeend', html);
+            else container.insertAdjacentHTML('afterbegin', html);
+        }
+
+        // --- التحديثات اللحظية للإحصائيات والسجل ---
+        function startLiveUpdates() {
+            onSnapshot(collection(db, "questions"), s => document.getElementById('qCount').innerText = s.size);
+            onSnapshot(collection(db, "replies_history"), s => document.getElementById('rCount').innerText = s.size);
+            
+            onSnapshot(query(collection(db, "replies_history"), orderBy("timestamp", "desc"), limit(10)), snap => {
+                const hList = document.getElementById('historyList'); hList.innerHTML = "";
+                snap.forEach(d => {
+                    const data = d.data();
+                    hList.innerHTML += `<div class="card" id="h-${d.id}" style="font-size:13px; border-right:3px solid var(--main-blue);">
+                        <b>س:</b> ${data.q}<br><b>ج:</b> ${data.r}
+                        <button class="btn-delete" style="padding:4px; font-size:11px; width:100%; margin-top:8px;" onclick="triggerDelete('${d.id}','replies_history')">حذف من السجل</button>
+                    </div>`;
+                });
+            });
+
+            onSnapshot(doc(db, "settings", "service_status"), d => {
+                const btn = document.getElementById('toggleServiceBtn');
+                const closed = d.exists() && d.data().closed;
+                btn.innerText = closed ? "🔴 مغلق" : "🟢 مفتوح";
+                btn.className = "status-toggle " + (closed ? "status-closed" : "status-open");
+            });
+
+            if (localStorage.getItem("adminRole") === "super") {
+                onSnapshot(query(collection(db, "admin_login_logs"), orderBy("timestamp", "desc")), snap => {
+                    const l = document.getElementById('logsList'); l.innerHTML = "";
+                    const uniqueIPs = {};
+                    snap.forEach(d => {
+                        const data = d.data();
+                        if (!uniqueIPs[data.ip]) {
+                            uniqueIPs[data.ip] = { count: 1, pass: data.pass };
+                            l.innerHTML += `<div class="card" style="font-size:12px">
+                                🌐 <b>${data.ip}</b> | محاولات: <span id="c-${data.ip.replace(/\./g,'-')}">1</span>
+                                <button class="btn-delete" style="padding:4px 10px; float:left; background:#000;" onclick="banIP('${data.ip}')">حظر</button><br>
+                                <small>آخر باسوورد: ${data.pass}</small>
+                            </div>`;
+                        } else {
+                            uniqueIPs[data.ip].count++;
+                            const el = document.getElementById(`c-${data.ip.replace(/\./g,'-')}`);
+                            if(el) el.innerText = uniqueIPs[data.ip].count;
+                        }
+                    });
+                });
+            }
+        }
+
+        // --- الرد والحذف ---
+        window.handleReply = async (cId, mail, q, id, method) => {
+            const r = prompt("اكتب الرد:");
+            if(!r) return;
+            try {
+                if(method === 'telegram') await fetch(`https://api.telegram.org/bot8326561499:AAF8y3t3Z9v2E2ryLF0gsP_gvRkZNENkmoU/sendMessage?chat_id=${cId}&text=${encodeURIComponent(r)}`);
+                if(method === 'email') await emailjs.send("service_kj15z59", "template_5rdomra", { to_email: mail, original_question: q, reply_text: r });
+                await addDoc(collection(db, "replies_history"), { q: q, r: r, timestamp: serverTimestamp() });
+                await deleteDoc(doc(db, "questions", id));
+            } catch(e) { alert("حدث خطأ في الإرسال"); }
+        };
+
+        window.triggerDelete = async (id, col) => {
+            if(!confirm("حذف نهائي؟")) return;
+            await deleteDoc(doc(db, col, id));
+        };
+
+        // --- أداة التشويش ---
+        document.addEventListener('selectionchange', () => {
+            const s = window.getSelection();
+            if (s.toString().trim().length > 0) {
+                const r = s.getRangeAt(0).getBoundingClientRect();
+                const t = document.getElementById('blurTool');
+                t.style.display = 'block'; t.style.top = `${r.top + window.scrollY - 45}px`; t.style.left = `${r.left + window.scrollX}px`;
+            }
+        });
+        window.hideBlurTool = () => setTimeout(() => document.getElementById('blurTool').style.display = 'none', 300);
+        window.applyBlurToSelection = (e) => {
+            e.preventDefault();
+            const range = window.getSelection().getRangeAt(0);
+            const span = document.createElement('span'); span.className = 'blurred-part';
+            span.onclick = function() { this.classList.toggle('blurred-part'); };
+            range.surroundContents(span);
+        };
+
+        // --- التحكم ---
+        window.toggleSort = () => {
+            currentSort = currentSort === "desc" ? "asc" : "desc";
+            document.getElementById('sortLabel').innerText = currentSort === "desc" ? "الأحدث أولاً" : "الأقدم أولاً";
+            lastVisibleDoc = null;
+            loadQuestions(false);
+        };
+        window.loadNextPage = () => loadQuestions(true);
+        window.banIP = async (ip) => { if(confirm("حظر هذا الـ IP؟")) await addDoc(collection(db, "blocked_ips"), { ip: ip }); };
+        window.showTab = (t) => {
+            document.getElementById('mainTab').classList.toggle('hidden', t !== 'main');
+            document.getElementById('logsTab').classList.toggle('hidden', t !== 'logs');
+            document.getElementById('tabMainBtn').classList.toggle('active', t === 'main');
+            document.getElementById('logsTabBtn').classList.toggle('active', t === 'logs');
+        };
+        window.logout = () => { localStorage.clear(); location.reload(); };
+        window.toggleService = async () => {
+            const sRef = doc(db, "settings", "service_status");
+            const snap = await getDoc(sRef);
+            await setDoc(sRef, { closed: snap.exists() ? !snap.data().closed : true });
+        };
+    </script>
+</body>
+</html>
