@@ -147,14 +147,18 @@
             startLiveUpdates();
         }
 
-        // --- نظام الجلب المحسن ---
+        // --- نظام الجلب السريع والمحسن ---
         async function loadQuestions(append = false) {
             const qList = document.getElementById('questionsList');
             const loadBtn = document.getElementById('loadMoreBtn');
             
+            if (!append && qList.children.length === 0) {
+                qList.innerHTML = "<div style='padding:20px; color:#666;'>⚡ جاري التحميل السريع...</div>";
+            }
+
             let q;
             if (append && lastVisibleDoc) {
-                loadBtn.innerText = "جاري التحميل...";
+                loadBtn.innerText = "جاري جلب المزيد...";
                 q = query(collection(db, "questions"), orderBy("timestamp", currentSort), startAfter(lastVisibleDoc), limit(10));
                 const snap = await getDocs(q);
                 if (snap.empty) { loadBtn.innerText = "نهاية الأسئلة"; return; }
@@ -164,31 +168,32 @@
                 return;
             }
 
-            // تحميل أولي (Snapshot تفاعلي)
             if (unsubQuestions) unsubQuestions();
-            qList.innerHTML = "جاري جلب الأسئلة...";
-            loadBtn.innerText = "عرض المزيد من الأسئلة ➕";
             
             q = query(collection(db, "questions"), orderBy("timestamp", currentSort), limit(20));
+            const firstSnap = await getDocs(q);
             
-            unsubQuestions = onSnapshot(q, (snap) => {
-                if (snap.empty && qList.children.length === 0) {
-                    qList.innerHTML = "لا توجد أسئلة حالياً";
-                    return;
-                }
-                
-                if (qList.innerHTML.includes("جاري جلب")) qList.innerHTML = "";
+            if (firstSnap.empty) {
+                qList.innerHTML = "لا توجد أسئلة حالياً";
+            } else {
+                qList.innerHTML = ""; 
+                firstSnap.forEach(d => renderSingleCard(d, qList, true));
+                lastVisibleDoc = firstSnap.docs[firstSnap.docs.length - 1];
+            }
 
+            unsubQuestions = onSnapshot(q, (snap) => {
                 snap.docChanges().forEach(change => {
-                    if (change.type === "added") renderSingleCard(change.doc, qList, false);
+                    if (change.type === "added") {
+                        if (!document.getElementById(`q-${change.doc.id}`)) {
+                            renderSingleCard(change.doc, qList, false);
+                            if (qList.innerHTML.includes("لا توجد أسئلة")) qList.innerHTML = "";
+                        }
+                    }
                     if (change.type === "removed") {
                         const el = document.getElementById(`q-${change.doc.id}`);
                         if (el) { el.classList.add('removing'); setTimeout(() => el.remove(), 400); }
                     }
                 });
-                lastVisibleDoc = snap.docs[snap.docs.length - 1];
-            }, (error) => {
-                qList.innerHTML = "خطأ في الاتصال، تأكد من الإنترنت.";
             });
         }
 
@@ -291,8 +296,8 @@
         window.toggleSort = () => {
             currentSort = currentSort === "desc" ? "asc" : "desc";
             document.getElementById('sortLabel').innerText = currentSort === "desc" ? "الأحدث أولاً" : "الأقدم أولاً";
-            lastVisibleDoc = null; // تصفير المؤشر ليعيد التحميل من البداية
-            document.getElementById('questionsList').innerHTML = ""; // مسح القائمة الحالية
+            lastVisibleDoc = null;
+            document.getElementById('questionsList').innerHTML = ""; 
             loadQuestions(false);
         };
         window.loadNextPage = () => loadQuestions(true);
