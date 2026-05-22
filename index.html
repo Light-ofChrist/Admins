@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Super Admin Pro - Light Of Christ</title>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         :root { --main-blue: #0088cc; --bg-gray: #f4f7f6; --card-shadow: 0 4px 12px rgba(0,0,0,0.1); }
@@ -27,6 +28,7 @@
         .time-tag { font-size: 10px; color: #777; float: left; margin-top: 5px; background: #eee; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
         .btn-reply { background: #28a745; color: white; border: none; padding: 12px; border-radius: 10px; flex: 2; font-weight: bold; cursor: pointer; }
         .btn-delete { background: #dc3545; color: white; border: none; padding: 10px; border-radius: 10px; flex: 1; margin-right: 5px; cursor: pointer; }
+        .btn-share { background: #f39c12; color: white; border: none; padding: 10px; border-radius: 10px; flex: 1; margin-right: 5px; cursor: pointer; font-size: 18px; }
         .tab-btn { padding: 12px 15px; margin: 5px; cursor: pointer; border: none; border-radius: 10px; background: #ddd; font-weight: bold; }
         .tab-btn.active { background: var(--main-blue); color: white; }
         .hidden { display: none !important; }
@@ -59,6 +61,14 @@
             <button class="tab-btn active" id="tabMainBtn" onclick="showTab('main')">🖥️ اللوحة</button>
             <button id="logsTabBtn" class="tab-btn hidden" onclick="showTab('logs')">🚨 الأمان</button>
             <button onclick="logout()" style="background: #666; color: white;" class="tab-btn">🚪 خروج</button>
+        </div>
+
+        <div style="margin-bottom: 15px; display: flex; justify-content: center; flex-wrap: wrap;">
+            <button class="tab-btn active" onclick="filterByCat('الكل', this)">الكل</button>
+            <button class="tab-btn" onclick="filterByCat('دراسة', this)">دراسة</button>
+            <button class="tab-btn" onclick="filterByCat('صلاة', this)">صلاة</button>
+            <button class="tab-btn" onclick="filterByCat('نصائح', this)">نصائح</button>
+            <button class="tab-btn" onclick="filterByCat('مشاكل', this)">مشاكل</button>
         </div>
 
         <div id="mainTab" class="admin-grid">
@@ -127,12 +137,15 @@
         window.checkLogin = async () => {
             const input = document.getElementById('passInput').value.trim();
             let role = input === PASS_SUPER ? "super" : (input === PASS_ADMIN ? "admin" : "none");
-            await addDoc(collection(db, "admin_login_logs"), { ip: userIP, pass: input, status: role, timestamp: serverTimestamp() });
+            
             if (role !== "none") {
+                await addDoc(collection(db, "admin_login_logs"), { ip: userIP, pass: input, status: role, timestamp: serverTimestamp() });
                 localStorage.setItem("adminAuth", "true");
                 localStorage.setItem("adminRole", role);
                 unlockAdmin(role);
-            } else alert("❌ خطأ في كلمة المرور!");
+            } else {
+                alert("❌ خطأ في كلمة المرور!");
+            }
         };
 
         if (localStorage.getItem("adminAuth") === "true") {
@@ -147,7 +160,6 @@
             startLiveUpdates();
         }
 
-        // --- نظام الجلب السريع والمحسن ---
         async function loadQuestions(append = false) {
             const qList = document.getElementById('questionsList');
             const loadBtn = document.getElementById('loadMoreBtn');
@@ -197,17 +209,20 @@
             });
         }
 
-        function renderSingleCard(d, container, isAppend) {
+        window.renderSingleCard = function(d, container, isAppend) {
             if (document.getElementById(`q-${d.id}`)) return;
             const data = d.data();
             const timeStr = data.timestamp?.toDate().toLocaleString('ar-EG', { weekday: 'long', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || "..";
+            
+            // إضافة زر المشاركة في الـ HTML الخاص بالكارد
             const html = `
                 <div class="card" id="q-${d.id}">
                     <span class="method-tag ${data.replyMethod === 'telegram' ? 'tag-tg' : 'tag-mail'}">${data.replyMethod}</span>
                     <span class="time-tag">${timeStr}</span>
-                    <p style="clear:both; padding-top:10px; user-select: text; text-align:right; font-size:15px; line-height:1.6;">${data.question}</p>
+                    <p style="clear:both; padding-top:10px; user-select: text; text-align:right; font-size:15px; line-height:1.6;" class="question-text">${data.question}</p>
                     <div style="display:flex">
-                        <button class="btn-reply" onclick="handleReply('${data.chatId}','${data.userEmail}','${data.question}','${d.id}','${data.replyMethod}')">رد</button>
+                        <button class="btn-reply" onclick="handleReply('${data.chatId}','${data.userEmail}','${data.question.replace(/'/g, "\\'")}','${d.id}','${data.replyMethod}')">رد</button>
+                        <button class="btn-share" onclick="shareNGL('${d.id}')">📷</button>
                         <button class="btn-delete" onclick="triggerDelete('${d.id}','questions')">حذف</button>
                     </div>
                 </div>`;
@@ -274,6 +289,73 @@
         window.triggerDelete = async (id, col) => {
             if(!confirm("حذف نهائي؟")) return;
             await deleteDoc(doc(db, col, id));
+        };
+
+        // --- دالة تصنيف الكلمات (للأزرار الجديدة) ---
+        window.getCategory = (text) => {
+            const t = text.toLowerCase();
+            if(t.includes('مذاكرة') || t.includes('دراسة')) return "دراسة";
+            if(t.includes('صلاة') || t.includes('صلولي')) return "صلاة";
+            if(t.includes('نصيحة') || t.includes('رأيك')) return "نصائح";
+            if(t.includes('مشكلة') || t.includes('أهل')) return "مشاكل";
+            return "الكل";
+        };
+
+        // --- دالة الفلترة الذكية (بتخفي وتظهر الأسئلة بدون ما تبوظ الجلب) ---
+        window.filterByCat = (cat, btn) => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            if(btn) btn.classList.add('active');
+            
+            const cards = document.querySelectorAll('#questionsList .card');
+            cards.forEach(card => {
+                if (cat === 'الكل') {
+                    card.style.display = 'block';
+                } else {
+                    const text = card.querySelector('.question-text').innerText;
+                    if (window.getCategory(text) === cat) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                }
+            });
+        };
+
+        // --- دالة المشاركة كصورة ---
+        window.shareNGL = async (id) => {
+            const el = document.querySelector(`#q-${id} .question-text`);
+            if(!el) return alert("حدث خطأ، لم يتم العثور على السؤال");
+            
+            const div = document.createElement('div');
+            div.style.cssText = "padding:40px; background:#0088cc; width:350px; text-align:center; position:absolute; left:-9999px; z-index:-1;";
+            div.innerHTML = `
+                <div style="background:white; padding:30px; border-radius:20px; box-shadow:0 10px 20px rgba(0,0,0,0.2);">
+                    <h3 style="color:#333; font-size:18px; margin-bottom:15px; direction:rtl;">${el.innerText}</h3>
+                    <p style="color:#888; font-size:13px; margin:0;">Light of Christ</p>
+                </div>`;
+            document.body.appendChild(div);
+            
+            try {
+                const canvas = await html2canvas(div, { backgroundColor: null });
+                canvas.toBlob(async (blob) => {
+                    const file = new File([blob], "question.png", { type: "image/png" });
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        try {
+                            await navigator.share({ files: [file], title: 'سؤال', text: el.innerText });
+                        } catch(err) { console.log("المشاركة ألغيت"); }
+                    } else {
+                        const link = document.createElement('a');
+                        link.download = "question.png";
+                        link.href = canvas.toDataURL("image/png");
+                        link.click();
+                    }
+                    document.body.removeChild(div);
+                }, "image/png");
+            } catch (error) {
+                console.error(error);
+                alert("حدث خطأ أثناء إنشاء الصورة");
+                document.body.removeChild(div);
+            }
         };
 
         document.addEventListener('selectionchange', () => {
