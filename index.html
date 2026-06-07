@@ -18,16 +18,17 @@
         .toggle-pass { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #666; font-size: 18px; }
         #loginBtn { padding: 15px 50px; border-radius: 12px; border: none; background: #1a1a1a; color: white; cursor: pointer; font-weight: bold; }
         #adminContent { display: none; max-width: 1200px; margin: auto; padding-top: 10px; }
-        .stats-bar { background: #333; color: white; padding: 15px; border-radius: 15px; margin-bottom: 15px; display: flex; justify-content: space-around; align-items: center; position: sticky; top: 5px; z-index: 100; }
+        .stats-bar { background: #333; color: white; padding: 15px; border-radius: 15px; margin-bottom: 15px; display: flex; justify-content: space-around; align-items: center; position: sticky; top: 5px; z-index: 100; flex-wrap: wrap; gap: 10px; }
         .admin-grid { display: grid; grid-template-columns: 1.8fr 1fr; gap: 20px; text-align: right; }
         @media (max-width: 768px) { .admin-grid { grid-template-columns: 1fr; } }
         .card { background: white; padding: 15px; margin-bottom: 15px; border-radius: 15px; box-shadow: var(--card-shadow); position: relative; transition: opacity 0.4s ease, transform 0.4s ease, max-height 0.4s ease; max-height: 1000px; overflow: hidden; opacity: 1; }
         .removing { opacity: 0; transform: scale(0.9) translateX(-20px); max-height: 0; margin-bottom: 0; padding: 0; pointer-events: none; }
         .method-tag { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 11px; color: white; margin-bottom: 8px; font-weight: bold; }
-        .tag-tg { background: #0088cc; } .tag-mail { background: #28a745; }
+        .tag-tg { background: #0088cc; } .tag-mail { background: #28a745; } .tag-noreply { background: #6c757d; }
         .time-tag { font-size: 10px; color: #777; float: left; margin-top: 5px; background: #eee; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
         .btn-reply { background: #28a745; color: white; border: none; padding: 12px; border-radius: 10px; flex: 2; font-weight: bold; cursor: pointer; }
         .btn-delete { background: #dc3545; color: white; border: none; padding: 10px; border-radius: 10px; flex: 1; margin-right: 5px; cursor: pointer; }
+        .btn-delete-small { background: #dc3545; color: white; border: none; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
         .btn-share { background: #f39c12; color: white; border: none; padding: 10px; border-radius: 10px; flex: 1; margin-right: 5px; cursor: pointer; font-size: 18px; }
         .tab-btn { padding: 12px 15px; margin: 5px; cursor: pointer; border: none; border-radius: 10px; background: #ddd; font-weight: bold; }
         .tab-btn.active { background: var(--main-blue); color: white; }
@@ -35,6 +36,15 @@
         .status-toggle { padding: 8px 15px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; }
         .status-open { background: #28a745; color: white; }
         .status-closed { background: #dc3545; color: white; }
+        .sort-btn { background: #6c757d; color: white; }
+        .sort-btn.active { background: #495057; }
+        .move-cat { background: #17a2b8; color: white; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-right: 5px; }
+        .multi-select { position: absolute; top: 10px; left: 10px; width: 20px; height: 20px; cursor: pointer; z-index: 10; }
+        .multi-actions { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; padding: 10px 20px; border-radius: 15px; z-index: 1000; display: none; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .selected-card { border: 3px solid var(--main-blue) !important; box-shadow: 0 0 15px rgba(0,136,204,0.3) !important; }
+        .reading-popup { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 4000; }
+        .reading-popup-content { background: white; padding: 30px; border-radius: 20px; max-width: 400px; width: 90%; text-align: right; }
+        .reading-popup input, .reading-popup select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #ddd; box-sizing: border-box; font-size: 15px; }
     </style>
 </head>
 <body onmousedown="hideBlurTool()">
@@ -53,12 +63,15 @@
     <div id="adminContent">
         <div class="stats-bar">
             <span>📥 الأسئلة: <b id="qCount">0</b></span>
+            <span>📖 القراءات: <b id="readCount">0</b></span>
             <button id="toggleServiceBtn" class="status-toggle" onclick="toggleService()">تحميل...</button>
+            <button id="toggleQuestionTimerBtn" class="status-toggle" onclick="toggleQuestionTimer()">⏱️التايمر</button>
             <span>📜 الردود: <b id="rCount">0</b></span>
         </div>
 
         <div style="margin-bottom: 15px;">
             <button class="tab-btn active" id="tabMainBtn" onclick="showTab('main')">🖥️ اللوحة</button>
+            <button id="tabReadingsBtn" class="tab-btn" onclick="showTab('readings')">📖 القراءات</button>
             <button id="logsTabBtn" class="tab-btn hidden" onclick="showTab('logs')">🚨 الأمان</button>
             <button onclick="logout()" style="background: #666; color: white;" class="tab-btn">🚪 خروج</button>
         </div>
@@ -69,6 +82,12 @@
             <button class="tab-btn" onclick="filterByCat('صلاة', this)">صلاة</button>
             <button class="tab-btn" onclick="filterByCat('نصائح', this)">نصائح</button>
             <button class="tab-btn" onclick="filterByCat('مشاكل', this)">مشاكل</button>
+        </div>
+
+        <div id="multiActionsBar" class="multi-actions">
+            <button class="tab-btn" style="background: #dc3545; color: white;" onclick="deleteMultiSelected()">🗑️ حذف الكل</button>
+            <button class="tab-btn" style="background: #f39c12; color: white;" onclick="shareMultiSelected()">📷 مشاركة الكل</button>
+            <button class="tab-btn" style="background: #6c757d; color: white;" onclick="clearMultiSelect()">❌ إلغاء</button>
         </div>
 
         <div id="mainTab" class="admin-grid">
@@ -86,6 +105,20 @@
             </div>
         </div>
 
+        <div id="readingsTab" class="hidden">
+            <div style="margin-bottom: 15px; display: flex; justify-content: center; flex-wrap: wrap; gap: 5px;">
+                <span style="font-weight: bold; padding: 10px;">الفرز:</span>
+                <button class="tab-btn sort-btn active" id="sortTime" onclick="changeSort('time')">⏰ الوقت</button>
+                <button class="tab-btn sort-btn" id="sortAlpha" onclick="changeSort('alpha')">🔤 أبجدي</button>
+                <button class="tab-btn sort-btn" id="sortCoins" onclick="changeSort('coins')">🪙 العملات</button>
+                <button class="tab-btn sort-btn" id="sortReadings" onclick="changeSort('readings')">📚 القراءات</button>
+            </div>
+            <div class="card" style="text-align: right;">
+                <h3>📖 سجل القراءات</h3>
+                <div id="readingsList"></div>
+            </div>
+        </div>
+
         <div id="logsTab" class="hidden">
             <div class="card" style="text-align: right;">
                 <h3>🕵️ سجل الدخول الفريد (Unique IPs)</h3>
@@ -96,7 +129,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, query, orderBy, doc, deleteDoc, addDoc, serverTimestamp, getDocs, where, getDoc, setDoc, limit, startAfter } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, query, orderBy, doc, deleteDoc, addDoc, serverTimestamp, getDocs, where, getDoc, setDoc, limit, startAfter, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDHODkkq-DF_u1KFPhd-K-Ya1yhGDcS2WE",
@@ -114,8 +147,12 @@
         const PASS_ADMIN = "Light-of-Christ", PASS_SUPER = "Makarios-2026";
         let lastVisibleDoc = null;
         let currentSort = "desc";
+        let currentSortType = "time";
         let userIP = "unknown";
         let unsubQuestions = null;
+        let allQuestionsData = [];
+        let selectedQuestions = new Set();
+        let questionTimerEnabled = true;
 
         async function initSecurity() {
             try {
@@ -137,7 +174,7 @@
         window.checkLogin = async () => {
             const input = document.getElementById('passInput').value.trim();
             let role = input === PASS_SUPER ? "super" : (input === PASS_ADMIN ? "admin" : "none");
-            
+
             if (role !== "none") {
                 await addDoc(collection(db, "admin_login_logs"), { ip: userIP, pass: input, status: role, timestamp: serverTimestamp() });
                 localStorage.setItem("adminAuth", "true");
@@ -152,10 +189,15 @@
             setTimeout(() => unlockAdmin(localStorage.getItem("adminRole")), 100);
         }
 
-        function unlockAdmin(role) {
+        async function unlockAdmin(role) {
             document.getElementById('loginOverlay').style.display = 'none';
             document.getElementById('adminContent').style.display = 'block';
             if (role === "super") document.getElementById('logsTabBtn').classList.remove('hidden');
+
+            const timerDoc = await getDoc(doc(db, "settings", "question_timer"));
+            questionTimerEnabled = timerDoc.exists() ? timerDoc.data().enabled : true;
+            updateQuestionTimerBtnUI();
+
             loadQuestions(false);
             startLiveUpdates();
         }
@@ -163,7 +205,7 @@
         async function loadQuestions(append = false) {
             const qList = document.getElementById('questionsList');
             const loadBtn = document.getElementById('loadMoreBtn');
-            
+
             if (!append && qList.children.length === 0) {
                 qList.innerHTML = "<div style='padding:20px; color:#666;'>⚡ جاري التحميل السريع...</div>";
             }
@@ -175,21 +217,29 @@
                 const snap = await getDocs(q);
                 if (snap.empty) { loadBtn.innerText = "نهاية الأسئلة"; return; }
                 lastVisibleDoc = snap.docs[snap.docs.length - 1];
-                snap.forEach(d => renderSingleCard(d, qList, true));
+                snap.forEach(d => {
+                    allQuestionsData.push({ id: d.id, data: d.data() });
+                    renderSingleCard(d, qList, true);
+                });
                 loadBtn.innerText = "عرض المزيد من الأسئلة ➕";
+                applyCurrentSort();
                 return;
             }
 
             if (unsubQuestions) unsubQuestions();
-            
+
             q = query(collection(db, "questions"), orderBy("timestamp", currentSort), limit(20));
             const firstSnap = await getDocs(q);
-            
+
+            allQuestionsData = [];
             if (firstSnap.empty) {
                 qList.innerHTML = "لا توجد أسئلة حالياً";
             } else {
                 qList.innerHTML = ""; 
-                firstSnap.forEach(d => renderSingleCard(d, qList, true));
+                firstSnap.forEach(d => {
+                    allQuestionsData.push({ id: d.id, data: d.data() });
+                    renderSingleCard(d, qList, true);
+                });
                 lastVisibleDoc = firstSnap.docs[firstSnap.docs.length - 1];
             }
 
@@ -197,13 +247,26 @@
                 snap.docChanges().forEach(change => {
                     if (change.type === "added") {
                         if (!document.getElementById(`q-${change.doc.id}`)) {
+                            allQuestionsData.push({ id: change.doc.id, data: change.doc.data() });
                             renderSingleCard(change.doc, qList, false);
                             if (qList.innerHTML.includes("لا توجد أسئلة")) qList.innerHTML = "";
+                            applyCurrentSort();
                         }
                     }
                     if (change.type === "removed") {
                         const el = document.getElementById(`q-${change.doc.id}`);
                         if (el) { el.classList.add('removing'); setTimeout(() => el.remove(), 400); }
+                        allQuestionsData = allQuestionsData.filter(item => item.id !== change.doc.id);
+                    }
+                    if (change.type === "modified") {
+                        const idx = allQuestionsData.findIndex(item => item.id === change.doc.id);
+                        if (idx !== -1) allQuestionsData[idx].data = change.doc.data();
+                        const el = document.getElementById(`q-${change.doc.id}`);
+                        if (el) {
+                            const data = change.doc.data();
+                            const catTag = el.querySelector('.cat-tag');
+                            if (catTag && data.category) catTag.innerText = data.category;
+                        }
                     }
                 });
             });
@@ -213,16 +276,24 @@
             if (document.getElementById(`q-${d.id}`)) return;
             const data = d.data();
             const timeStr = data.timestamp?.toDate().toLocaleString('ar-EG', { weekday: 'long', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || "..";
-            
-            // إضافة زر المشاركة في الـ HTML الخاص بالكارد
+            const category = data.category || getCategory(data.question);
+
+            let methodClass = 'tag-noreply';
+            if (data.replyMethod === 'telegram') methodClass = 'tag-tg';
+            else if (data.replyMethod === 'email') methodClass = 'tag-mail';
+
             const html = `
-                <div class="card" id="q-${d.id}">
-                    <span class="method-tag ${data.replyMethod === 'telegram' ? 'tag-tg' : 'tag-mail'}">${data.replyMethod}</span>
+                <div class="card" id="q-${d.id}" data-cat="${category}">
+                    <input type="checkbox" class="multi-select" onchange="toggleMultiSelect('${d.id}', this)" title="اختيار للحذف/المشاركة">
+                    <span class="method-tag ${methodClass}">${data.replyMethod === 'noreply' ? 'بدون رد' : data.replyMethod}</span>
+                    <span class="cat-tag" style="display:inline-block; padding:3px 8px; border-radius:4px; background:#e9ecef; font-size:11px; margin-right:5px;">${category}</span>
                     <span class="time-tag">${timeStr}</span>
                     <p style="clear:both; padding-top:10px; user-select: text; text-align:right; font-size:15px; line-height:1.6;" class="question-text">${data.question}</p>
-                    <div style="display:flex">
-                        <button class="btn-reply" onclick="handleReply('${data.chatId}','${data.userEmail}','${data.question.replace(/'/g, "\\'")}','${d.id}','${data.replyMethod}')">رد</button>
+                    <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:10px;">
+                        <button class="btn-reply" onclick="handleReply('${data.chatId || ''}','${data.userEmail || ''}','${data.question.replace(/'/g, "\'")}','${d.id}','${data.replyMethod}')">رد</button>
                         <button class="btn-share" onclick="shareNGL('${d.id}')">📷</button>
+                        <button class="btn-share" onclick="shareBlurred('${d.id}')" style="background:#6c757d;" title="مشاركة مشوشة">👁️</button>
+                        <button class="move-cat" onclick="moveCategory('${d.id}')">🏷️ نقل</button>
                         <button class="btn-delete" onclick="triggerDelete('${d.id}','questions')">حذف</button>
                     </div>
                 </div>`;
@@ -233,7 +304,8 @@
         function startLiveUpdates() {
             onSnapshot(collection(db, "questions"), s => document.getElementById('qCount').innerText = s.size);
             onSnapshot(collection(db, "replies_history"), s => document.getElementById('rCount').innerText = s.size);
-            
+            onSnapshot(collection(db, "readings"), s => document.getElementById('readCount').innerText = s.size);
+
             onSnapshot(query(collection(db, "replies_history"), orderBy("timestamp", "desc"), limit(10)), snap => {
                 const hList = document.getElementById('historyList'); hList.innerHTML = "";
                 snap.forEach(d => {
@@ -250,6 +322,35 @@
                 const closed = d.exists() && d.data().closed;
                 btn.innerText = closed ? "🔴 مغلق" : "🟢 مفتوح";
                 btn.className = "status-toggle " + (closed ? "status-closed" : "status-open");
+            });
+
+            onSnapshot(doc(db, "settings", "question_timer"), d => {
+                if (d.exists()) {
+                    questionTimerEnabled = d.data().enabled;
+                    updateQuestionTimerBtnUI();
+                }
+            });
+
+            onSnapshot(query(collection(db, "readings"), orderBy("timestamp", "desc"), limit(50)), snap => {
+                const rList = document.getElementById('readingsList');
+                if (!rList) return;
+                rList.innerHTML = "";
+                if (snap.empty) {
+                    rList.innerHTML = "<div style='padding:20px; color:#666;'>لا توجد قراءات بعد</div>";
+                    return;
+                }
+                snap.forEach(d => {
+                    const data = d.data();
+                    const timeStr = data.timestamp?.toDate().toLocaleString('ar-EG') || "..";
+                    const ageInfo = data.age ? ` | العمر: ${data.age}` : '';
+                    const govInfo = data.governorate ? ` | ${data.governorate}` : '';
+                    rList.innerHTML += `<div class="card" id="r-${d.id}" style="font-size:13px; border-right:3px solid #28a745;">
+                        <b>👤 ${data.userName || 'مستخدم'}</b>${ageInfo}${govInfo}<br>
+                        ${data.testament === 'old' ? 'العهد القديم' : 'العهد الجديد'} | <b>📖 ${data.book}</b> - أصحاح ${data.chapter} - آية ${data.verse}<br>
+                        <span class="time-tag">${timeStr}</span>
+                        <button class="btn-delete-small" style="margin-top:8px;" onclick="triggerDelete('${d.id}','readings')">🗑حذف 
+                    </div>`;
+                });
             });
 
             if (localStorage.getItem("adminRole") === "super") {
@@ -275,7 +376,19 @@
             }
         }
 
+        function updateQuestionTimerBtnUI() {
+            const btn = document.getElementById('toggleQuestionTimerBtn');
+            if (btn) {
+                btn.innerText = questionTimerEnabled ? "⏱️ التايمر : مفعل" : "⏱️ التايمر : معطل";
+                btn.className = "status-toggle " + (questionTimerEnabled ? "status-open" : "status-closed");
+            }
+        }
+
         window.handleReply = async (cId, mail, q, id, method) => {
+            if (method === 'noreply') {
+                alert("هذا السؤال بدون رد");
+                return;
+            }
             const r = prompt("اكتب الرد:");
             if(!r) return;
             try {
@@ -291,7 +404,6 @@
             await deleteDoc(doc(db, col, id));
         };
 
-        // --- دالة تصنيف الكلمات (للأزرار الجديدة) ---
         window.getCategory = (text) => {
             const t = text.toLowerCase();
             if(t.includes('مذاكرة') || t.includes('دراسة')) return "دراسة";
@@ -301,31 +413,143 @@
             return "الكل";
         };
 
-        // --- دالة الفلترة الذكية (بتخفي وتظهر الأسئلة بدون ما تبوظ الجلب) ---
         window.filterByCat = (cat, btn) => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                if (b.innerText.includes('دراسة') || b.innerText.includes('صلاة') || b.innerText.includes('نصائح') || b.innerText.includes('مشاكل') || b.innerText === 'الكل') {
+                    b.classList.remove('active');
+                }
+            });
             if(btn) btn.classList.add('active');
-            
+
             const cards = document.querySelectorAll('#questionsList .card');
             cards.forEach(card => {
                 if (cat === 'الكل') {
                     card.style.display = 'block';
                 } else {
-                    const text = card.querySelector('.question-text').innerText;
-                    if (window.getCategory(text) === cat) {
-                        card.style.display = 'block';
-                    } else {
-                        card.style.display = 'none';
-                    }
+                    const cardCat = card.getAttribute('data-cat') || getCategory(card.querySelector('.question-text').innerText);
+                    card.style.display = (cardCat === cat) ? 'block' : 'none';
                 }
             });
         };
 
-        // --- دالة المشاركة كصورة ---
+        window.moveCategory = async (questionId) => {
+            const cats = ['دراسة', 'صلاة', 'نصائح', 'مشاكل'];
+            const choice = prompt(`اختر التصنيف الجديد:
+1. دراسة
+2. صلاة
+3. نصائح
+4. مشاكل`);
+            if (!choice) return;
+            let newCat = '';
+            if (choice === '1') newCat = 'دراسة';
+            else if (choice === '2') newCat = 'صلاة';
+            else if (choice === '3') newCat = 'نصائح';
+            else if (choice === '4') newCat = 'مشاكل';
+            else { alert("اختيار غير صحيح"); return; }
+
+            try {
+                await updateDoc(doc(db, "questions", questionId), { category: newCat });
+                const card = document.getElementById(`q-${questionId}`);
+                if (card) {
+                    card.setAttribute('data-cat', newCat);
+                    const catTag = card.querySelector('.cat-tag');
+                    if (catTag) catTag.innerText = newCat;
+                }
+                alert(`✅ تم نقل السؤال إلى: ${newCat}`);
+            } catch(e) {
+                alert("حدث خطأ أثناء النقل");
+            }
+        };
+
+        window.toggleMultiSelect = (id, checkbox) => {
+            const card = document.getElementById(`q-${id}`);
+            if (checkbox.checked) {
+                selectedQuestions.add(id);
+                card.classList.add('selected-card');
+            } else {
+                selectedQuestions.delete(id);
+                card.classList.remove('selected-card');
+            }
+            updateMultiActionsBar();
+        };
+
+        function updateMultiActionsBar() {
+            const bar = document.getElementById('multiActionsBar');
+            bar.style.display = selectedQuestions.size > 0 ? 'flex' : 'none';
+        }
+
+        window.clearMultiSelect = () => {
+            selectedQuestions.clear();
+            document.querySelectorAll('.multi-select').forEach(cb => cb.checked = false);
+            document.querySelectorAll('.selected-card').forEach(c => c.classList.remove('selected-card'));
+            updateMultiActionsBar();
+        };
+
+        window.deleteMultiSelected = async () => {
+            if (selectedQuestions.size === 0) return;
+            if (!confirm(`حذف ${selectedQuestions.size} سؤال نهائياً؟`)) return;
+
+            let deleted = 0;
+            for (const id of selectedQuestions) {
+                try {
+                    await deleteDoc(doc(db, "questions", id));
+                    deleted++;
+                } catch(e) { console.error("Error deleting:", id); }
+            }
+            alert(`✅ تم حذف ${deleted} سؤال`);
+            clearMultiSelect();
+        };
+
+        window.shareMultiSelected = async () => {
+            if (selectedQuestions.size === 0) return;
+
+            const div = document.createElement('div');
+            div.style.cssText = "padding:30px; background:#f4f7f6; width:400px; position:absolute; left:-9999px; z-index:-1;";
+
+            let questionsHTML = '';
+            selectedQuestions.forEach(id => {
+                const card = document.getElementById(`q-${id}`);
+                if (card) {
+                    const text = card.querySelector('.question-text').innerText;
+                    questionsHTML += `<div style="background:white; padding:20px; margin-bottom:15px; border-radius:15px; box-shadow:0 4px 12px rgba(0,0,0,0.1); text-align:right; direction:rtl;">
+                        <p style="font-size:16px; color:#333; margin:0; line-height:1.6;">${text}</p>
+                    </div>`;
+                }
+            });
+
+            div.innerHTML = `
+                <div style="text-align:center; margin-bottom:20px;">
+                    <h2 style="color:var(--main-blue); margin:0;">Light of Christ</h2>
+                    <p style="color:#888; font-size:13px;">مجموعة من الأسئلة</p>
+                </div>
+                ${questionsHTML}`;
+            document.body.appendChild(div);
+
+            try {
+                const canvas = await html2canvas(div, { backgroundColor: '#f4f7f6', scale: 2 });
+                canvas.toBlob(async (blob) => {
+                    const file = new File([blob], "questions.png", { type: "image/png" });
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        try { await navigator.share({ files: [file], title: 'مجموعة أسئلة', text: 'Light of Christ' }); } catch(err) {}
+                    } else {
+                        const link = document.createElement('a');
+                        link.download = "questions.png";
+                        link.href = canvas.toDataURL("image/png");
+                        link.click();
+                    }
+                    document.body.removeChild(div);
+                    clearMultiSelect();
+                }, "image/png");
+            } catch (error) {
+                alert("حدث خطأ أثناء إنشاء الصورة");
+                document.body.removeChild(div);
+            }
+        };
+
         window.shareNGL = async (id) => {
             const el = document.querySelector(`#q-${id} .question-text`);
             if(!el) return alert("حدث خطأ، لم يتم العثور على السؤال");
-            
+
             const div = document.createElement('div');
             div.style.cssText = "padding:40px; background:#0088cc; width:350px; text-align:center; position:absolute; left:-9999px; z-index:-1;";
             div.innerHTML = `
@@ -334,15 +558,13 @@
                     <p style="color:#888; font-size:13px; margin:0;">Light of Christ</p>
                 </div>`;
             document.body.appendChild(div);
-            
+
             try {
                 const canvas = await html2canvas(div, { backgroundColor: null });
                 canvas.toBlob(async (blob) => {
                     const file = new File([blob], "question.png", { type: "image/png" });
                     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                        try {
-                            await navigator.share({ files: [file], title: 'سؤال', text: el.innerText });
-                        } catch(err) { console.log("المشاركة ألغيت"); }
+                        try { await navigator.share({ files: [file], title: 'سؤال', text: el.innerText }); } catch(err) { console.log("المشاركة ألغيت"); }
                     } else {
                         const link = document.createElement('a');
                         link.download = "question.png";
@@ -357,6 +579,83 @@
                 document.body.removeChild(div);
             }
         };
+
+        window.shareBlurred = async (id) => {
+            const card = document.getElementById(`q-${id}`);
+            if (!card) return;
+
+            const clone = card.cloneNode(true);
+            clone.querySelectorAll('.question-text').forEach(el => {
+                el.style.filter = 'blur(6px)';
+                el.style.color = 'transparent';
+                el.style.background = '#222';
+                el.style.borderRadius = '4px';
+            });
+
+            const div = document.createElement('div');
+            div.style.cssText = "padding:40px; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); width:400px; text-align:center; position:absolute; left:-9999px; z-index:-1;";
+            div.innerHTML = `
+                <div style="background:white; padding:30px; border-radius:20px; box-shadow:0 10px 20px rgba(0,0,0,0.2); direction:rtl;">
+                    <p style="color:#888; font-size:12px; margin-bottom:10px;">🔒 محتوى مشوش</p>
+                    ${clone.innerHTML}
+                    <p style="color:#888; font-size:13px; margin-top:15px;">Light of Christ</p>
+                </div>`;
+            document.body.appendChild(div);
+
+            try {
+                const canvas = await html2canvas(div, { backgroundColor: null });
+                canvas.toBlob(async (blob) => {
+                    const file = new File([blob], "blurred.png", { type: "image/png" });
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        try { await navigator.share({ files: [file], title: 'محتوى مشوش', text: 'Light of Christ' }); } catch(err) {}
+                    } else {
+                        const link = document.createElement('a');
+                        link.download = "blurred.png";
+                        link.href = canvas.toDataURL("image/png");
+                        link.click();
+                    }
+                    document.body.removeChild(div);
+                }, "image/png");
+            } catch (error) {
+                alert("حدث خطأ أثناء إنشاء الصورة");
+                document.body.removeChild(div);
+            }
+        };
+
+        window.changeSort = (type) => {
+            currentSortType = type;
+            document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`sort${type.charAt(0).toUpperCase() + type.slice(1)}`).classList.add('active');
+            applyCurrentSort();
+        };
+
+        function applyCurrentSort() {
+            const container = document.getElementById('questionsList');
+            const cards = Array.from(container.querySelectorAll('.card'));
+
+            if (currentSortType === 'time') return;
+
+            cards.sort((a, b) => {
+                if (currentSortType === 'alpha') {
+                    const textA = a.querySelector('.question-text').innerText;
+                    const textB = b.querySelector('.question-text').innerText;
+                    return textA.localeCompare(textB, 'ar');
+                }
+                if (currentSortType === 'coins') {
+                    const coinsA = parseInt(a.querySelector('.user-info-bar')?.innerText.match(/🪙 (\d+)/)?.[1] || 0);
+                    const coinsB = parseInt(b.querySelector('.user-info-bar')?.innerText.match(/🪙 (\d+)/)?.[1] || 0);
+                    return coinsB - coinsA;
+                }
+                if (currentSortType === 'readings') {
+                    const readA = parseInt(a.querySelector('.user-info-bar')?.innerText.match(/📚 (\d+)/)?.[1] || 0);
+                    const readB = parseInt(b.querySelector('.user-info-bar')?.innerText.match(/📚 (\d+)/)?.[1] || 0);
+                    return readB - readA;
+                }
+                return 0;
+            });
+
+            cards.forEach(card => container.appendChild(card));
+        }
 
         document.addEventListener('selectionchange', () => {
             const s = window.getSelection();
@@ -386,8 +685,10 @@
         window.banIP = async (ip) => { if(confirm("حظر هذا الـ IP؟")) await addDoc(collection(db, "blocked_ips"), { ip: ip }); };
         window.showTab = (t) => {
             document.getElementById('mainTab').classList.toggle('hidden', t !== 'main');
+            document.getElementById('readingsTab').classList.toggle('hidden', t !== 'readings');
             document.getElementById('logsTab').classList.toggle('hidden', t !== 'logs');
             document.getElementById('tabMainBtn').classList.toggle('active', t === 'main');
+            document.getElementById('tabReadingsBtn').classList.toggle('active', t === 'readings');
             document.getElementById('logsTabBtn').classList.toggle('active', t === 'logs');
         };
         window.logout = () => { localStorage.clear(); location.reload(); };
@@ -395,6 +696,14 @@
             const sRef = doc(db, "settings", "service_status");
             const snap = await getDoc(sRef);
             await setDoc(sRef, { closed: snap.exists() ? !snap.data().closed : true });
+        };
+        window.toggleQuestionTimer = async () => {
+            const sRef = doc(db, "settings", "question_timer");
+            const snap = await getDoc(sRef);
+            const newState = snap.exists() ? !snap.data().enabled : false;
+            await setDoc(sRef, { enabled: newState });
+            questionTimerEnabled = newState;
+            updateQuestionTimerBtnUI();
         };
     </script>
 </body>
