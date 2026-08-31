@@ -43,9 +43,26 @@
         .multi-actions { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; padding: 10px 20px; border-radius: 15px; z-index: 1000; display: none; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         .selected-card { border: 3px solid var(--main-blue) !important; box-shadow: 0 0 15px rgba(0,136,204,0.3) !important; }
         .reading-popup { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 4000; }
+        #readingsList { max-height: 65vh; overflow-y: auto; padding-right: 5px; }
+        #readingsList::-webkit-scrollbar { width: 8px; }
+        #readingsList::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        #readingsList::-webkit-scrollbar-thumb { background: var(--main-blue); border-radius: 4px; }
+        .user-summary { cursor: pointer; transition: background 0.2s; }
+        .user-summary:hover { background: #f0f8ff; }
+        .user-details { display: none; padding: 10px 15px; background: #fafafa; border-top: 1px solid #e0e0e0; border-radius: 0 0 10px 10px; }
+        .user-details.open { display: block; }
+        .merged-reading { background: #e8f5e9; border-right: 3px solid #28a745; padding: 8px 12px; margin: 6px 0; border-radius: 8px; font-size: 12px; }
+        .merged-reading .count-badge { background: #28a745; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-right: 8px; }
+        .single-reading { background: white; border-right: 2px solid #ddd; padding: 6px 10px; margin: 4px 0; border-radius: 6px; font-size: 12px; }
+        .user-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 5px; }
+        .user-stats { display: flex; gap: 10px; font-size: 12px; color: #555; }
+        .stat-pill { background: #e3f2fd; padding: 2px 8px; border-radius: 10px; }
+        .expand-icon { transition: transform 0.3s; font-size: 14px; color: #666; }
+        .expand-icon.rotated { transform: rotate(180deg); }
         .reading-popup-content { background: white; padding: 30px; border-radius: 20px; max-width: 400px; width: 90%; text-align: right; }
         .reading-popup input, .reading-popup select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #ddd; box-sizing: border-box; font-size: 15px; }
     </style>
+<base target="_blank">
 </head>
 <body onmousedown="hideBlurTool()">
 
@@ -108,10 +125,10 @@
         <div id="readingsTab" class="hidden">
             <div style="margin-bottom: 15px; display: flex; justify-content: center; flex-wrap: wrap; gap: 5px;">
                 <span style="font-weight: bold; padding: 10px;">الفرز:</span>
-                <button class="tab-btn sort-btn active" id="sortTime" onclick="changeSort('time')">⏰ الوقت</button>
-                <button class="tab-btn sort-btn" id="sortAlpha" onclick="changeSort('alpha')">🔤 أبجدي</button>
+                <button class="tab-btn sort-btn active" id="sortAlpha" onclick="changeSort('alpha')">🔤 أبجدي</button>
                 <button class="tab-btn sort-btn" id="sortCoins" onclick="changeSort('coins')">🪙 العملات</button>
                 <button class="tab-btn sort-btn" id="sortReadings" onclick="changeSort('readings')">📚 القراءات</button>
+                <button class="tab-btn sort-btn" id="sortDirBtn" onclick="toggleSortDir()" title="عكس اتجاه الترتيب">⬇️ عكس</button>
             </div>
             <div class="card" style="text-align: right;">
                 <h3>📖 سجل القراءات</h3>
@@ -153,6 +170,10 @@
         let allQuestionsData = [];
         let selectedQuestions = new Set();
         let questionTimerEnabled = true;
+        let allReadingsData = [];
+        let currentReadingsSort = 'alpha';
+        let currentReadingsDir = 'desc';
+        let usersData = {}; // userName -> { coins, readingCount }
 
         async function initSecurity() {
             try {
@@ -332,25 +353,22 @@
             });
 
             onSnapshot(query(collection(db, "readings"), orderBy("timestamp", "desc"), limit(50)), snap => {
-                const rList = document.getElementById('readingsList');
-                if (!rList) return;
-                rList.innerHTML = "";
-                if (snap.empty) {
-                    rList.innerHTML = "<div style='padding:20px; color:#666;'>لا توجد قراءات بعد</div>";
-                    return;
-                }
+                allReadingsData = [];
+                snap.forEach(d => allReadingsData.push({ id: d.id, data: d.data() }));
+                renderReadings();
+            });
+
+            // Load users data for coins
+            onSnapshot(collection(db, "users"), snap => {
+                usersData = {};
                 snap.forEach(d => {
                     const data = d.data();
-                    const timeStr = data.timestamp?.toDate().toLocaleString('ar-EG') || "..";
-                    const ageInfo = data.age ? ` | العمر: ${data.age}` : '';
-                    const govInfo = data.governorate ? ` | ${data.governorate}` : '';
-                    rList.innerHTML += `<div class="card" id="r-${d.id}" style="font-size:13px; border-right:3px solid #28a745;">
-                        <b>👤 ${data.userName || 'مستخدم'}</b>${ageInfo}${govInfo}<br>
-                        ${data.testament === 'old' ? 'العهد القديم' : 'العهد الجديد'} | <b>📖 ${data.book}</b> - أصحاح ${data.chapter} - آية ${data.verse}<br>
-                        <span class="time-tag">${timeStr}</span>
-                        <button class="btn-delete-small" style="margin-top:8px;" onclick="triggerDelete('${d.id}','readings')">🗑حذف 
-                    </div>`;
+                    usersData[d.id] = { coins: data.coins || 0, readingCount: data.readingCount || 0 };
                 });
+                // Re-render if currently on readings tab
+                if (document.getElementById('readingsTab') && !document.getElementById('readingsTab').classList.contains('hidden')) {
+                    renderReadings();
+                }
             });
 
             if (localStorage.getItem("adminRole") === "super") {
@@ -622,11 +640,185 @@
             }
         };
 
+        function groupReadingsByUser() {
+            const users = {};
+            allReadingsData.forEach(item => {
+                const name = (item.data.userName || 'مستخدم').trim();
+                const uid = item.data.userId || '';
+                if (!users[name]) {
+                    users[name] = { items: [], totalCoins: 0, totalReadings: 0, age: item.data.age || '', governorate: item.data.governorate || '', userId: uid };
+                }
+                users[name].items.push(item);
+                users[name].totalReadings += 1;
+            });
+            // Get real coins from usersData
+            Object.values(users).forEach(u => {
+                if (u.userId && usersData[u.userId]) {
+                    u.totalCoins = usersData[u.userId].coins || 0;
+                }
+            });
+            return users;
+        }
+
+        function mergeSimilarReadings(items) {
+            const keyMap = {};
+            items.forEach(item => {
+                const d = item.data;
+                const key = `${d.testament || ''}::${d.book || ''}::${d.chapter || ''}::${d.verse || ''}`;
+                if (!keyMap[key]) {
+                    keyMap[key] = { ...item, count: 1, ids: [item.id] };
+                } else {
+                    keyMap[key].count += 1;
+                    keyMap[key].ids.push(item.id);
+                }
+            });
+            return Object.values(keyMap);
+        }
+
+        function sortByNumeric(a, b) {
+            // Sort numerically by chapter then verse
+            const chA = parseInt(a.data.chapter) || 0;
+            const chB = parseInt(b.data.chapter) || 0;
+            if (chA !== chB) return chA - chB;
+            const vA = parseInt(a.data.verse) || 0;
+            const vB = parseInt(b.data.verse) || 0;
+            return vA - vB;
+        }
+
+        function renderReadings() {
+            const rList = document.getElementById('readingsList');
+            if (!rList) return;
+            rList.innerHTML = "";
+            if (allReadingsData.length === 0) {
+                rList.innerHTML = "<div style='padding:20px; color:#666;'>لا توجد قراءات بعد</div>";
+                return;
+            }
+
+            let users = groupReadingsByUser();
+            let userEntries = Object.entries(users);
+
+            // Sort users based on current sort
+            userEntries.sort((a, b) => {
+                let cmp = 0;
+                if (currentReadingsSort === 'alpha') {
+                    cmp = a[0].localeCompare(b[0], 'ar');
+                } else if (currentReadingsSort === 'coins') {
+                    cmp = a[1].totalCoins - b[1].totalCoins;
+                } else if (currentReadingsSort === 'readings') {
+                    cmp = a[1].totalReadings - b[1].totalReadings;
+                }
+                return currentReadingsDir === 'desc' ? -cmp : cmp;
+            });
+
+            userEntries.forEach(([name, userData]) => {
+                const safeName = name.replace(/'/g, "\'");
+                const ageInfo = userData.age ? ` | العمر: ${userData.age}` : '';
+                const govInfo = userData.governorate ? ` | ${userData.governorate}` : '';
+
+                rList.innerHTML += `
+                <div class="card" style="padding:0; overflow:hidden;">
+                    <div class="user-summary" onclick="toggleUserDetails('${safeName}')">
+                        <div style="padding:15px;">
+                            <div class="user-header">
+                                <div>
+                                    <b style="font-size:14px;">👤 ${name}</b>
+                                    <span style="color:#888; font-size:11px;">${ageInfo}${govInfo}</span>
+                                </div>
+                                <div class="user-stats">
+                                    <span class="stat-pill">🪙 ${userData.totalCoins}</span>
+                                    <span class="stat-pill">📚 ${userData.totalReadings}</span>
+                                    <span class="expand-icon" id="icon-${safeName}">▼</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="user-details" id="details-${safeName}">
+                        <div id="inner-${safeName}">جاري التحميل...</div>
+                    </div>
+                </div>`;
+            });
+        }
+
+        window.toggleUserDetails = (name) => {
+            const details = document.getElementById(`details-${name}`);
+            const icon = document.getElementById(`icon-${name}`);
+            if (!details) return;
+
+            if (details.classList.contains('open')) {
+                details.classList.remove('open');
+                icon.classList.remove('rotated');
+            } else {
+                document.querySelectorAll('.user-details.open').forEach(el => el.classList.remove('open'));
+                document.querySelectorAll('.expand-icon.rotated').forEach(el => el.classList.remove('rotated'));
+
+                details.classList.add('open');
+                icon.classList.add('rotated');
+                renderUserReadings(name);
+            }
+        };
+
+        function renderUserReadings(name) {
+            const inner = document.getElementById(`inner-${name}`);
+            if (!inner) return;
+
+            const users = groupReadingsByUser();
+            const userData = users[name];
+            if (!userData) { inner.innerHTML = 'لا توجد بيانات'; return; }
+
+            const merged = mergeSimilarReadings(userData.items);
+
+            // Always sort inner readings numerically by chapter then verse
+            merged.sort((a, b) => {
+                let cmp = sortByNumeric(a, b);
+                return currentReadingsDir === 'desc' ? -cmp : cmp;
+            });
+
+            let html = '';
+            merged.forEach(m => {
+                const d = m.data;
+                const timeStr = d.timestamp?.toDate ? d.timestamp.toDate().toLocaleString('ar-EG') : "..";
+                const testament = d.testament === 'old' ? 'العهد القديم' : 'العهد الجديد';
+                const countBadge = m.count > 1 ? `<span class="count-badge">×${m.count}</span>` : '';
+
+                html += `<div class="merged-reading">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div><b>📖 ${d.book}</b> - أصحاح ${d.chapter} - آية ${d.verse} ${countBadge}</div>
+                        <button class="btn-delete-small" onclick="deleteMergedReadings([${m.ids.map(id => "'"+id+"'").join(',')}])">🗑</button>
+                    </div>
+                    <div style="color:#666; font-size:11px; margin-top:4px;">${testament} | ${timeStr}</div>
+                </div>`;
+            });
+
+            inner.innerHTML = html || 'لا توجد قراءات';
+        }
+
+        window.deleteMergedReadings = async (ids) => {
+            if (!confirm(`حذف ${ids.length} قراءة؟`)) return;
+            for (const id of ids) {
+                try { await deleteDoc(doc(db, "readings", id)); } catch(e) {}
+            }
+        };
+
         window.changeSort = (type) => {
-            currentSortType = type;
+            currentReadingsSort = type;
             document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(`sort${type.charAt(0).toUpperCase() + type.slice(1)}`).classList.add('active');
-            applyCurrentSort();
+            renderReadings();
+            document.querySelectorAll('.user-details.open').forEach(el => {
+                const name = el.id.replace('details-', '');
+                renderUserReadings(name);
+            });
+        };
+
+        window.toggleSortDir = () => {
+            currentReadingsDir = currentReadingsDir === 'desc' ? 'asc' : 'desc';
+            const btn = document.getElementById('sortDirBtn');
+            if (btn) btn.innerText = currentReadingsDir === 'desc' ? '⬇️ عكس' : '⬆️ عكس';
+            renderReadings();
+            document.querySelectorAll('.user-details.open').forEach(el => {
+                const name = el.id.replace('details-', '');
+                renderUserReadings(name);
+            });
         };
 
         function applyCurrentSort() {
