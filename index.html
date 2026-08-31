@@ -42,6 +42,8 @@
         .multi-select { position: absolute; top: 10px; left: 10px; width: 20px; height: 20px; cursor: pointer; z-index: 10; }
         .multi-actions { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; padding: 10px 20px; border-radius: 15px; z-index: 1000; display: none; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         .selected-card { border: 3px solid var(--main-blue) !important; box-shadow: 0 0 15px rgba(0,136,204,0.3) !important; }
+        .user-select-checkbox { position: absolute; top: 10px; left: 10px; width: 20px; height: 20px; cursor: pointer; z-index: 10; }
+        .user-card-wrapper { position: relative; }
         .reading-popup { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 4000; }
         #readingsList { max-height: 65vh; overflow-y: auto; padding-right: 5px; }
         #readingsList::-webkit-scrollbar { width: 8px; }
@@ -105,6 +107,10 @@
             <button class="tab-btn" style="background: #dc3545; color: white;" onclick="deleteMultiSelected()">🗑️ حذف الكل</button>
             <button class="tab-btn" style="background: #f39c12; color: white;" onclick="shareMultiSelected()">📷 مشاركة الكل</button>
             <button class="tab-btn" style="background: #6c757d; color: white;" onclick="clearMultiSelect()">❌ إلغاء</button>
+        </div>
+        <div id="userMultiActionsBar" class="multi-actions">
+            <button class="tab-btn" style="background: #dc3545; color: white;" onclick="deleteSelectedUsers()">🗑️ مسح المحددين</button>
+            <button class="tab-btn" style="background: #6c757d; color: white;" onclick="clearUserMultiSelect()">❌ إلغاء</button>
         </div>
 
         <div id="mainTab" class="admin-grid">
@@ -174,6 +180,7 @@
         let currentReadingsSort = 'alpha';
         let currentReadingsDir = 'desc';
         let usersData = {}; // userName -> { coins, readingCount }
+        let selectedUsers = new Set();
 
         async function initSecurity() {
             try {
@@ -716,7 +723,8 @@
                 const govInfo = userData.governorate ? ` | ${userData.governorate}` : '';
 
                 rList.innerHTML += `
-                <div class="card" style="padding:0; overflow:hidden;">
+                <div class="card user-card-wrapper" id="ucard-${safeName}" style="padding:0; overflow:hidden;">
+                    <input type="checkbox" class="user-select-checkbox" onchange="toggleUserSelect('${safeName}', this)" onclick="event.stopPropagation()" title="تحديد للحذف">
                     <div class="user-summary" onclick="toggleUserDetails('${safeName}')">
                         <div style="padding:15px;">
                             <div class="user-header">
@@ -731,6 +739,9 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                    <div style="padding:0 15px 10px 15px; text-align:left;">
+                        <button class="btn-delete-small" onclick="event.stopPropagation(); deleteUserAllReadings('${safeName}', '${userData.userId || ''}')">🗑️ مسح الاسم بالكامل</button>
                     </div>
                     <div class="user-details" id="details-${safeName}">
                         <div id="inner-${safeName}">جاري التحميل...</div>
@@ -797,6 +808,39 @@
             for (const id of ids) {
                 try { await deleteDoc(doc(db, "readings", id)); } catch(e) {}
             }
+        };
+
+        window.deleteUserAllReadings = async (name, userId) => {
+            if (!confirm(`هل أنت متأكد من مسح كل قراءات "${name}" بالكامل؟
+
+⚠️ هذا الإجراء لا يمكن التراجع عنه!`)) return;
+
+            // Find all readings for this user
+            const users = groupReadingsByUser();
+            const userData = users[name];
+            if (!userData || userData.items.length === 0) {
+                alert('لا توجد قراءات لهذا المستخدم');
+                return;
+            }
+
+            let deleted = 0;
+            for (const item of userData.items) {
+                try {
+                    await deleteDoc(doc(db, "readings", item.id));
+                    deleted++;
+                } catch(e) { console.error('Error deleting:', item.id); }
+            }
+
+            // Also delete from users collection if userId exists
+            if (userId) {
+                try { await deleteDoc(doc(db, "users", userId)); } catch(e) {}
+            }
+
+            alert(`✅ تم مسح ${deleted} قراءة لـ "${name}"`);
+
+            // Close details if open
+            const details = document.getElementById(`details-${name}`);
+            if (details) details.classList.remove('open');
         };
 
         window.changeSort = (type) => {
