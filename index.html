@@ -51,8 +51,12 @@
         #readingsList::-webkit-scrollbar-thumb { background: var(--main-blue); border-radius: 4px; }
         .user-summary { cursor: pointer; transition: background 0.2s; }
         .user-summary:hover { background: #f0f8ff; }
-        .user-details { display: none; padding: 10px 15px; background: #fafafa; border-top: 1px solid #e0e0e0; border-radius: 0 0 10px 10px; }
-        .user-details.open { display: block; }
+        .user-details { display: none; padding: 10px 15px; background: #fafafa; border-top: 1px solid #e0e0e0; border-radius: 0 0 10px 10px; max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+        .user-details.open { display: block; max-height: 400px; overflow-y: auto; }
+        .user-details.open::-webkit-scrollbar { width: 6px; }
+        .user-details.open::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
+        .user-details.open::-webkit-scrollbar-thumb { background: var(--main-blue); border-radius: 3px; }
+        .quiz-answer { background: #fff3cd; border-right: 3px solid #f39c12; padding: 6px 10px; margin: 4px 0 8px 0; border-radius: 6px; font-size: 12px; color: #856404; }
         .merged-reading { background: #e8f5e9; border-right: 3px solid #28a745; padding: 8px 12px; margin: 6px 0; border-radius: 8px; font-size: 12px; }
         .merged-reading .count-badge { background: #28a745; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-right: 8px; }
         .single-reading { background: white; border-right: 2px solid #ddd; padding: 6px 10px; margin: 4px 0; border-radius: 6px; font-size: 12px; }
@@ -791,11 +795,13 @@
                 const testament = d.testament === 'old' ? 'العهد القديم' : 'العهد الجديد';
                 const countBadge = m.count > 1 ? `<span class="count-badge">×${m.count}</span>` : '';
 
+                const quizHtml = d.quizAnswer ? `<div class="quiz-answer">📝 ${d.quizAnswer}</div>` : '';
                 html += `<div class="merged-reading">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <div><b>📖 ${d.book}</b> - أصحاح ${d.chapter} - آية ${d.verse} ${countBadge}</div>
                         <button class="btn-delete-small" onclick="deleteMergedReadings([${m.ids.map(id => "'"+id+"'").join(',')}])">🗑</button>
                     </div>
+                    ${quizHtml}
                     <div style="color:#666; font-size:11px; margin-top:4px;">${testament} | ${timeStr}</div>
                 </div>`;
             });
