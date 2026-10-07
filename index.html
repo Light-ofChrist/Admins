@@ -170,6 +170,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         emailjs.init("ezEIpgi7PHlkP22mm");
+        const ADMIN_NOTIFY_EMAIL = "zxxxxdhe@gmail.com"; // ← غير ده لإيميلك
 
         const PASS_ADMIN = "Light-of-Christ", PASS_SUPER = "Makarios-2026";
         let lastVisibleDoc = null;
@@ -283,6 +284,15 @@
                             renderSingleCard(change.doc, qList, false);
                             if (qList.innerHTML.includes("لا توجد أسئلة")) qList.innerHTML = "";
                             applyCurrentSort();
+                            // Notify admin
+                            const qData = change.doc.data();
+                            try {
+                                emailjs.send("service_kj15z59", "template_5rdomra", {
+                                    to_email: ADMIN_NOTIFY_EMAIL,
+                                    original_question: qData.question?.substring(0, 100) || 'سؤال جديد',
+                                    reply_text: `سؤال جديد وصل!\nالتصنيف: ${qData.category || 'عام'}\nطريقة الرد: ${qData.replyMethod || 'بدون رد'}`
+                                });
+                            } catch(e) {}
                         }
                     }
                     if (change.type === "removed") {
@@ -737,7 +747,10 @@
                                     <span style="color:#888; font-size:11px;">${ageInfo}${govInfo}</span>
                                 </div>
                                 <div class="user-stats">
-                                    <span class="stat-pill">🪙 ${userData.totalCoins}</span>
+                                    <span class="stat-pill" style="display:flex; align-items:center; gap:4px;">
+                                        🪙 ${userData.totalCoins}
+                                        <button class="btn-delete-small" style="padding:2px 6px; font-size:10px;" onclick="event.stopPropagation(); deductCoins('${userData.userId || ''}', 1)">−</button>
+                                    </span>
                                     <span class="stat-pill">📚 ${userData.totalReadings}</span>
                                     <span class="expand-icon" id="icon-${safeName}">▼</span>
                                 </div>
@@ -748,6 +761,11 @@
                         <button class="btn-delete-small" onclick="event.stopPropagation(); deleteUserAllReadings('${safeName}', '${userData.userId || ''}')">🗑️ مسح الاسم بالكامل</button>
                     </div>
                     <div class="user-details" id="details-${safeName}">
+                        <div style="display:flex; gap:5px; margin-bottom:10px; flex-wrap:wrap;">
+                            <button class="btn-delete-small" style="background:var(--main-blue);" onclick="event.stopPropagation(); setInnerSort('${safeName}', 'alpha')">🔤 أبجدي</button>
+                            <button class="btn-delete-small" style="background:var(--main-blue);" onclick="event.stopPropagation(); setInnerSort('${safeName}', 'time')">⏰ وقت</button>
+                            <button class="btn-delete-small" style="background:#6c757d;" onclick="event.stopPropagation(); setInnerSort('${safeName}', 'toggle')">⬇️ عكس</button>
+                        </div>
                         <div id="inner-${safeName}">جاري التحميل...</div>
                     </div>
                 </div>`;
@@ -772,6 +790,18 @@
             }
         };
 
+        const innerSortState = {}; // name -> { type: 'alpha'|'time'|'numeric', dir: 'asc'|'desc' }
+
+        window.setInnerSort = (name, type) => {
+            if (!innerSortState[name]) innerSortState[name] = { type: 'numeric', dir: 'desc' };
+            if (type === 'toggle') {
+                innerSortState[name].dir = innerSortState[name].dir === 'desc' ? 'asc' : 'desc';
+            } else {
+                innerSortState[name].type = type;
+            }
+            renderUserReadings(name);
+        };
+
         function renderUserReadings(name) {
             const inner = document.getElementById(`inner-${name}`);
             if (!inner) return;
@@ -781,11 +811,20 @@
             if (!userData) { inner.innerHTML = 'لا توجد بيانات'; return; }
 
             const merged = mergeSimilarReadings(userData.items);
+            const sortCfg = innerSortState[name] || { type: 'numeric', dir: 'desc' };
 
-            // Always sort inner readings numerically by chapter then verse
             merged.sort((a, b) => {
-                let cmp = sortByNumeric(a, b);
-                return currentReadingsDir === 'desc' ? -cmp : cmp;
+                let cmp = 0;
+                if (sortCfg.type === 'alpha') {
+                    cmp = (a.data.book || '').localeCompare(b.data.book || '', 'ar');
+                } else if (sortCfg.type === 'time') {
+                    const ta = a.data.timestamp?.toMillis ? a.data.timestamp.toMillis() : (a.data.timestamp?.seconds * 1000 || 0);
+                    const tb = b.data.timestamp?.toMillis ? b.data.timestamp.toMillis() : (b.data.timestamp?.seconds * 1000 || 0);
+                    cmp = ta - tb;
+                } else {
+                    cmp = sortByNumeric(a, b);
+                }
+                return sortCfg.dir === 'desc' ? -cmp : cmp;
             });
 
             let html = '';
@@ -814,6 +853,20 @@
             for (const id of ids) {
                 try { await deleteDoc(doc(db, "readings", id)); } catch(e) {}
             }
+        };
+
+        window.deductCoins = async (userId, amount) => {
+            if (!userId) { alert('لا يوجد معرف مستخدم'); return; }
+            if (!confirm(`تقليل ${amount} عملة من هذا المستخدم؟`)) return;
+            try {
+                const userRef = doc(db, "users", userId);
+                const userSnap = await getDoc(userRef);
+                if (!userSnap.exists()) { alert('المستخدم غير موجود'); return; }
+                const currentCoins = userSnap.data().coins || 0;
+                if (currentCoins < amount) { alert('الرصيد لا يكفي'); return; }
+                await updateDoc(userRef, { coins: currentCoins - amount });
+                alert(`✅ تم خصم ${amount} عملة`);
+            } catch(e) { alert('حدث خطأ'); }
         };
 
         window.deleteUserAllReadings = async (name, userId) => {
